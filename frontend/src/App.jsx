@@ -61,7 +61,7 @@ function App() {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const res = await fetch('http://localhost:8000/chat', {
+      const res = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updatedMessages.map(m => ({ role: m.role, text: m.text })) }),
@@ -111,9 +111,9 @@ function App() {
 
   const fetchGraphData = async () => {
     try {
-      const resNodes = await fetch('http://localhost:8000/nodes').catch(()=>null);
-      const resLinks = await fetch('http://localhost:8000/links').catch(()=>null);
-      const resCats = await fetch('http://localhost:8000/categories').catch(()=>null);
+      const resNodes = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes').catch(()=>null);
+      const resLinks = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/links').catch(()=>null);
+      const resCats = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/categories').catch(()=>null);
 
       if (resNodes && resNodes.ok && resLinks && resLinks.ok) {
         const nData = await resNodes.json();
@@ -205,13 +205,13 @@ function App() {
     }
 
     try {
-      await fetch('http://localhost:8000/nodes', {
+      await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newNode)
       });
       for(let l of newLinks) {
-        await fetch('http://localhost:8000/links', {
+        await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(l)
@@ -241,7 +241,7 @@ function App() {
     const newCat = { id: catId, name: name, color: newCatColor, icon: "📁" };
     
     // Sync to backend
-    fetch('http://localhost:8000/categories', {
+    fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newCat)
@@ -263,7 +263,7 @@ function App() {
       seed: Math.random() * 8
     };
 
-    fetch('http://localhost:8000/nodes', {
+    fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newHubNode)
@@ -281,14 +281,14 @@ function App() {
     const deletingNode = nodes.find(n => n.id === nodeId);
     const label = deletingNode ? deletingNode.label : "Catatan";
 
-    await fetch(`http://localhost:8000/nodes/${nodeId}`, { method: 'DELETE' });
+    await fetch(`https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes/${nodeId}`, { method: 'DELETE' });
     setNodes(prev => prev.filter(n => n.id !== nodeId));
     setLinks(prev => prev.filter(l => l.source !== nodeId && l.target !== nodeId));
     setSelectedNodes(prev => prev.filter(id => id !== nodeId));
     
     // Sync Category Deletion
     if (deletingNode && deletingNode.isHub) {
-      await fetch(`http://localhost:8000/categories/${deletingNode.category}`, { method: 'DELETE' }).catch(() => null);
+      await fetch(`https://brainnode-pro-291742583447.asia-southeast2.run.app/categories/${deletingNode.category}`, { method: 'DELETE' }).catch(() => null);
       setActiveCategories(prev => prev.filter(c => c.id !== deletingNode.category));
       if (currentCategoryFilter === deletingNode.category) setCurrentCategoryFilter("All");
       if (ingestCategory === deletingNode.category) setIngestCategory("Trading");
@@ -313,7 +313,7 @@ function App() {
   const saveEdit = async () => {
     if(!editTitle || !editBody) return showToast("❌ Judul dan isi tidak boleh kosong!");
     try {
-      await fetch(`http://localhost:8000/nodes/${selectedNode.id}`, {
+      await fetch(`https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes/${selectedNode.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: editTitle, content: editBody })
@@ -350,7 +350,7 @@ function App() {
       createdStep: currentTimelineStep,
       seed: Math.random() * 5
     };
-    fetch('http://localhost:8000/nodes', {
+    fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newCard)
@@ -425,7 +425,7 @@ function App() {
                   formData.append("file", file);
                   
                   try {
-                    const res = await fetch('http://localhost:8000/ingest', {
+                    const res = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/ingest', {
                       method: 'POST',
                       body: formData
                     });
