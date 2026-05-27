@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+__pycache__/
+
+# Environments
+venv/
+env/
+.env
+.env.*
+.venv
+brainnode_env/
+Miniconda3/
+
+# Build Outputs
+dist/
+build/
+
+# OS Files
+.DS_Store
