@@ -1,7 +1,7 @@
 # 🌌 BrainNode Pro
 **AI-Powered Knowledge Graph & Intelligent Chat Assistant**
 
-BrainNode Pro adalah aplikasi *Full-Stack* mutakhir yang memadukan kekuatan **Google Gemini 1.5 Pro** dengan visualisasi data interaktif. Proyek ini dirancang untuk membantu pengguna membangun "Second Brain" melalui graf pengetahuan (*Knowledge Graph*) yang dinamis dalam bentuk galaksi node.
+BrainNode Pro adalah aplikasi *Full-Stack* mutakhir yang memadukan kekuatan **Google Gemini 3.5 Flash** dengan visualisasi data interaktif. Proyek ini dirancang untuk membantu pengguna membangun "Second Brain" melalui graf pengetahuan (*Knowledge Graph*) yang dinamis dalam bentuk galaksi node.
 
 ---
 
