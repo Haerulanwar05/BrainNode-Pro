@@ -32,16 +32,32 @@ Aplikasi ini sudah di-deploy secara global dan dapat diakses langsung melalui ta
 
 ## 🏗️ Struktur Proyek
 ```text
-BrainNode-Pro/
-├── backend/            # Python FastAPI Server
-│   ├── Dockerfile      
-│   ├── main.py         
-│   └── requirements.txt
-├── frontend/           # React Application
-│   ├── Dockerfile      
-│   ├── src/            
-│   └── package.json
-└── README.md           # Dokumentasi proyek
+BrainNode-Production/
+├── backend/                  # Python FastAPI Server
+│   ├── .env                  
+│   ├── ai_service.py         
+│   ├── database.py           
+│   ├── Dockerfile            
+│   ├── main.py               
+│   ├── mock_data.py          
+│   ├── models.py             
+│   ├── requirements.txt      
+│   └── seed_data.py          
+├── frontend/                 # React Application
+│   ├── src/                  
+│   │   ├── components/       
+│   │   ├── App.jsx           
+│   │   ├── index.css         
+│   │   └── main.jsx          
+│   ├── Dockerfile            
+│   ├── index.html            
+│   ├── package-lock.json     
+│   ├── package.json          
+│   ├── postcss.config.js     
+│   ├── tailwind.config.js    
+│   └── vite.config.js        
+├── .gitignore                
+└── README.md                 # Dokumentasi proyek
 ```
 
 ## 👤 Author
