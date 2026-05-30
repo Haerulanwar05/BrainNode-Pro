@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import GalaxyCanvas from './components/GalaxyCanvas';
 import TipTapEditor from './components/TipTapEditor';
 
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const INITIAL_CATEGORIES = [];
 
 function App() {
@@ -83,7 +84,7 @@ function App() {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/chat', {
+      const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updatedMessages.map(m => ({ role: m.role, text: m.text })) }),
@@ -136,9 +137,9 @@ function App() {
 
   const fetchGraphData = async (layoutId = activeLayout) => {
     try {
-      const resNodes = await fetch(`http://127.0.0.1:8000/nodes?layout_id=${layoutId}`).catch(()=>null);
-      const resLinks = await fetch(`http://127.0.0.1:8000/links?layout_id=${layoutId}`).catch(()=>null);
-      const resCats = await fetch(`http://127.0.0.1:8000/categories?layout_id=${layoutId}`).catch(()=>null);
+      const resNodes = await fetch(`${API_URL}/nodes?layout_id=${layoutId}`).catch(()=>null);
+      const resLinks = await fetch(`${API_URL}/links?layout_id=${layoutId}`).catch(()=>null);
+      const resCats = await fetch(`${API_URL}/categories?layout_id=${layoutId}`).catch(()=>null);
       
       setNodes([]); setLinks([]); setActiveCategories([]);
 
@@ -170,7 +171,7 @@ function App() {
   };
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/layouts')
+    fetch(`${API_URL}/layouts`)
       .then(r => r.json())
       .then(d => { if (d.status === 'success') setLayouts(d.layouts); })
       .catch(()=>null);
@@ -242,13 +243,13 @@ function App() {
     }
 
     try {
-      await fetch(`http://127.0.0.1:8000/nodes?layout_id=${activeLayout}`, {
+      await fetch(`${API_URL}/nodes?layout_id=${activeLayout}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newNode)
       });
       for(let l of newLinks) {
-        await fetch(`http://127.0.0.1:8000/links?layout_id=${activeLayout}`, {
+        await fetch(`${API_URL}/links?layout_id=${activeLayout}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(l)
@@ -278,7 +279,7 @@ function App() {
     const newCat = { id: catId, name: name, color: newCatColor, icon: "📁" };
     
     // Sync to backend
-    fetch(`http://127.0.0.1:8000/categories?layout_id=${activeLayout}`, {
+    fetch(`${API_URL}/categories?layout_id=${activeLayout}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newCat)
@@ -300,7 +301,7 @@ function App() {
       seed: Math.random() * 8
     };
 
-    fetch(`http://127.0.0.1:8000/nodes?layout_id=${activeLayout}`, {
+    fetch(`${API_URL}/nodes?layout_id=${activeLayout}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newHubNode)
@@ -318,14 +319,14 @@ function App() {
     const deletingNode = nodes.find(n => n.id === nodeId);
     const label = deletingNode ? deletingNode.label : "Catatan";
 
-    await fetch(`http://127.0.0.1:8000/nodes/${nodeId}?layout_id=${activeLayout}`, { method: 'DELETE' });
+    await fetch(`${API_URL}/nodes/${nodeId}?layout_id=${activeLayout}`, { method: 'DELETE' });
     setNodes(prev => prev.filter(n => n.id !== nodeId));
     setLinks(prev => prev.filter(l => l.source !== nodeId && l.target !== nodeId));
     setSelectedNodes(prev => prev.filter(id => id !== nodeId));
     
     // Sync Category Deletion
     if (deletingNode && deletingNode.isHub) {
-      await fetch(`http://127.0.0.1:8000/categories/${deletingNode.category}?layout_id=${activeLayout}`, { method: 'DELETE' }).catch(() => null);
+      await fetch(`${API_URL}/categories/${deletingNode.category}?layout_id=${activeLayout}`, { method: 'DELETE' }).catch(() => null);
       setActiveCategories(prev => prev.filter(c => c.id !== deletingNode.category));
       setNodes(prev => prev.filter(n => n.category !== deletingNode.category));
       setLinks(prev => prev.filter(l => {
@@ -358,7 +359,7 @@ function App() {
   const saveEdit = async () => {
     if(!editTitle || !editBody) return showToast("❌ Judul dan isi tidak boleh kosong!");
     try {
-      await fetch(`http://127.0.0.1:8000/nodes/${selectedNode.id}?layout_id=${activeLayout}`, {
+      await fetch(`${API_URL}/nodes/${selectedNode.id}?layout_id=${activeLayout}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: editTitle, content: editBody })
@@ -397,7 +398,7 @@ function App() {
       createdStep: currentTimelineStep,
       seed: Math.random() * 5
     };
-    fetch(`http://127.0.0.1:8000/nodes?layout_id=${activeLayout}`, {
+    fetch(`${API_URL}/nodes?layout_id=${activeLayout}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newCard)
@@ -562,7 +563,7 @@ function App() {
                     setLayoutMenuOpen(false);
                     const name = prompt("Nama layout baru (tanpa spasi):");
                     if (name && name.trim() !== "") {
-                       fetch(`http://127.0.0.1:8000/layouts/${name.trim()}`, { method: 'POST' }).then(() => {
+                       fetch(`${API_URL}/layouts/${name.trim()}`, { method: 'POST' }).then(() => {
                           setLayouts(prev => { if(!prev.includes(name.trim())) return [...prev, name.trim()]; return prev; });
                           setActiveLayout(name.trim());
                        });
@@ -578,7 +579,7 @@ function App() {
                     onClick={() => {
                       setLayoutMenuOpen(false);
                       if (window.confirm(`Yakin ingin menghapus layout "${activeLayout}" beserta seluruh isinya?`)) {
-                        fetch(`http://127.0.0.1:8000/layouts/${activeLayout}`, { method: 'DELETE' }).then(res => res.json()).then(data => {
+                        fetch(`${API_URL}/layouts/${activeLayout}`, { method: 'DELETE' }).then(res => res.json()).then(data => {
                           if (data.status === 'success') {
                             setLayouts(prev => prev.filter(l => l !== activeLayout));
                             setActiveLayout("default");
@@ -631,7 +632,7 @@ function App() {
                   formData.append("file", file);
                   
                   try {
-                    const res = await fetch(`http://127.0.0.1:8000/ingest?layout_id=${activeLayout}`, {
+                    const res = await fetch(`${API_URL}/ingest?layout_id=${activeLayout}`, {
                       method: 'POST',
                       body: formData
                     });
