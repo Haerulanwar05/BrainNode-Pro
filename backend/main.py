@@ -52,7 +52,7 @@ def get_layouts():
         return {"status": "success", "layouts": layouts}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error", "layouts": ["default"]}
+        return {"status": "success", "layouts": list(mock_state.keys())}
 
 @app.post("/layouts/{layout_id}")
 def create_layout(layout_id: str):
@@ -64,7 +64,8 @@ def create_layout(layout_id: str):
         return {"status": "success"}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error"}
+        get_mock(layout_id)
+        return {"status": "success", "mode": "mock_fallback"}
 
 @app.delete("/layouts/{layout_id}")
 def delete_layout(layout_id: str):
@@ -97,7 +98,9 @@ def delete_layout(layout_id: str):
         return {"status": "success"}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error", "message": str(e)}
+        if layout_id in mock_state:
+            del mock_state[layout_id]
+        return {"status": "success", "mode": "mock_fallback"}
 
 @app.get("/nodes", response_model=List[Node])
 def get_nodes(layout_id: str = "default"):
@@ -108,7 +111,7 @@ def get_nodes(layout_id: str = "default"):
         return [Node(**doc.to_dict()) for doc in docs]
     except Exception as e:
         logger.error(f"Error: {e}")
-        return []
+        return [Node(**data) for data in get_mock(layout_id)["nodes"]]
 
 @app.post("/nodes")
 def create_node(node: Node, layout_id: str = "default"):
@@ -141,7 +144,10 @@ def delete_node(node_id: str, layout_id: str = "default"):
         return {"status": "success", "mode": "firestore"}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error"}
+        state = get_mock(layout_id)
+        state["nodes"] = [n for n in state["nodes"] if n["id"] != node_id]
+        state["links"] = [l for l in state["links"] if l["source"] != node_id and l["target"] != node_id]
+        return {"status": "success", "mode": "mock_fallback"}
 
 @app.put("/nodes/{node_id}")
 def update_node(node_id: str, updates: Dict[str, Any], layout_id: str = "default"):
@@ -155,7 +161,10 @@ def update_node(node_id: str, updates: Dict[str, Any], layout_id: str = "default
         return {"status": "success", "mode": "firestore"}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error"}
+        for n in get_mock(layout_id)["nodes"]:
+            if n["id"] == node_id:
+                n.update(updates)
+        return {"status": "success", "mode": "mock_fallback"}
 
 @app.get("/links", response_model=List[Link])
 def get_links(layout_id: str = "default"):
@@ -166,7 +175,7 @@ def get_links(layout_id: str = "default"):
         return [Link(**doc.to_dict()) for doc in docs]
     except Exception as e:
         logger.error(f"Error: {e}")
-        return []
+        return [Link(**data) for data in get_mock(layout_id)["links"]]
 
 @app.post("/links")
 def create_link(link: Link, layout_id: str = "default"):
@@ -179,7 +188,8 @@ def create_link(link: Link, layout_id: str = "default"):
         return {"status": "success", "mode": "firestore"}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error"}
+        get_mock(layout_id)["links"].append(link.dict())
+        return {"status": "success", "mode": "mock_fallback"}
 
 @app.get("/categories", response_model=List[Category])
 def get_categories(layout_id: str = "default"):
@@ -190,7 +200,7 @@ def get_categories(layout_id: str = "default"):
         return [Category(**doc.to_dict()) for doc in docs]
     except Exception as e:
         logger.error(f"Error: {e}")
-        return []
+        return [Category(**data) for data in get_mock(layout_id)["categories"]]
 
 @app.post("/categories")
 def create_category(category: Category, layout_id: str = "default"):
@@ -205,7 +215,11 @@ def create_category(category: Category, layout_id: str = "default"):
         return {"status": "success", "mode": "firestore"}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error"}
+        state = get_mock(layout_id)
+        existing = next((c for c in state["categories"] if c["id"] == category.id), None)
+        if not existing:
+            state["categories"].append(category.dict())
+        return {"status": "success", "mode": "mock_fallback"}
 
 @app.delete("/categories/{category_id}")
 def delete_category(category_id: str, layout_id: str = "default"):
@@ -235,7 +249,12 @@ def delete_category(category_id: str, layout_id: str = "default"):
         return {"status": "success", "mode": "firestore"}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error"}
+        state = get_mock(layout_id)
+        state["categories"] = [c for c in state["categories"] if c["id"] != category_id]
+        nodes_to_delete = [n["id"] for n in state["nodes"] if n.get("category") == category_id]
+        state["nodes"] = [n for n in state["nodes"] if n.get("category") != category_id]
+        state["links"] = [l for l in state["links"] if l["source"] not in nodes_to_delete and l["target"] not in nodes_to_delete]
+        return {"status": "success", "mode": "mock_fallback"}
 
 @app.post("/ingest")
 async def ingest_file(layout_id: str = Query("default"), file: UploadFile = File(...)):
