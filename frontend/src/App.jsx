@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import GalaxyCanvas from './components/GalaxyCanvas';
 import TipTapEditor from './components/TipTapEditor';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL || "https://brainnode-pro-291742583447.asia-southeast2.run.app";
 const INITIAL_CATEGORIES = [];
 
 function App() {
