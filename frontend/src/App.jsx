@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import GalaxyCanvas from './components/GalaxyCanvas';
 
-const INITIAL_CATEGORIES = [
-  { id: "Trading", name: "Trading", color: "#10b981", icon: "📈" },
-  { id: "Fisika", name: "Fisika", color: "#06b6d4", icon: "⚛️" },
-  { id: "Informatika", name: "Informatika", color: "#8b5cf6", icon: "🤖" }
-];
+const INITIAL_CATEGORIES = [];
 
 function App() {
   const [nodes, setNodes] = useState([]);
@@ -23,6 +19,11 @@ function App() {
   const [isReaderEditing, setIsReaderEditing] = useState(false);
   const [activeCategories, setActiveCategories] = useState(INITIAL_CATEGORIES);
   const [toastMessage, setToastMessage] = useState(null);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [layouts, setLayouts] = useState(["default"]);
+  const [activeLayout, setActiveLayout] = useState("default");
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
+  const [isTypingModalOpen, setIsTypingModalOpen] = useState(false);
 
   const [readerOpen, setReaderOpen] = useState(false);
   const [synthesisModalOpen, setSynthesisModalOpen] = useState(false);
@@ -31,7 +32,7 @@ function App() {
   // Ingest form state
   const [ingestTitle, setIngestTitle] = useState("");
   const [ingestBody, setIngestBody] = useState("");
-  const [ingestCategory, setIngestCategory] = useState("Trading");
+  const [ingestCategory, setIngestCategory] = useState("");
   const [newCatName, setNewCatName] = useState("");
   const [newCatColor, setNewCatColor] = useState("#8b5cf6");
 
@@ -47,6 +48,26 @@ function App() {
   ]);
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
+  
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [nodeUpdates, setNodeUpdates] = useState({});
+
+  const getRelativeTimeString = () => {
+    if (isReaderEditing) return "Sedang Diedit...";
+    const updateTime = selectedNode ? nodeUpdates[selectedNode.id] : null;
+    if (!updateTime) return "Belum Diubah Sesi Ini";
+
+    const diffSecs = Math.floor((currentTime - updateTime) / 1000);
+    if (diffSecs < 10) return "Diperbarui Baru Saja";
+    if (diffSecs < 60) return `Diperbarui ${diffSecs} detik lalu`;
+    
+    const diffMins = Math.floor(diffSecs / 60);
+    if (diffMins < 60) return `Diperbarui ${diffMins} menit lalu`;
+    
+    const hours = Math.floor(diffMins / 60);
+    if (hours < 24) return `Diperbarui ${hours} jam lalu`;
+    return `Diperbarui ${Math.floor(hours / 24)} hari lalu`;
+  };
 
   const handleSendChat = async () => {
     if (!chatInput.trim() || isChatLoading) return;
@@ -61,7 +82,7 @@ function App() {
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const res = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/chat', {
+      const res = await fetch('http://127.0.0.1:8000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updatedMessages.map(m => ({ role: m.role, text: m.text })) }),
@@ -98,8 +119,11 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     
+    const clockTimer = setInterval(() => setCurrentTime(Date.now()), 5000);
+    
     return () => {
       clearTimeout(timer);
+      clearInterval(clockTimer);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -109,11 +133,13 @@ function App() {
     setTimeout(() => setToastMessage(null), 2500);
   };
 
-  const fetchGraphData = async () => {
+  const fetchGraphData = async (layoutId = activeLayout) => {
     try {
-      const resNodes = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes').catch(()=>null);
-      const resLinks = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/links').catch(()=>null);
-      const resCats = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/categories').catch(()=>null);
+      const resNodes = await fetch(`http://127.0.0.1:8000/nodes?layout_id=${layoutId}`).catch(()=>null);
+      const resLinks = await fetch(`http://127.0.0.1:8000/links?layout_id=${layoutId}`).catch(()=>null);
+      const resCats = await fetch(`http://127.0.0.1:8000/categories?layout_id=${layoutId}`).catch(()=>null);
+      
+      setNodes([]); setLinks([]); setActiveCategories([]);
 
       if (resNodes && resNodes.ok && resLinks && resLinks.ok) {
         const nData = await resNodes.json();
@@ -143,8 +169,15 @@ function App() {
   };
 
   useEffect(() => {
-    fetchGraphData();
+    fetch('http://127.0.0.1:8000/layouts')
+      .then(r => r.json())
+      .then(d => { if (d.status === 'success') setLayouts(d.layouts); })
+      .catch(()=>null);
   }, []);
+
+  useEffect(() => {
+    fetchGraphData(activeLayout);
+  }, [activeLayout]);
 
   const handleSimulateUpload = (type) => {
     showToast("⚙️ Mengekstrak konten file...");
@@ -168,10 +201,13 @@ function App() {
       showToast("❌ Judul dan Teks Isi tidak boleh kosong!");
       return;
     }
+    if (!ingestCategory) {
+      showToast("❌ Silakan buat atau pilih klaster terlebih dahulu!");
+      return;
+    }
     const catConfig = activeCategories.find(c => c.id === ingestCategory);
     let color = catConfig ? catConfig.color : "#10b981";
     let hubId = `hub_${ingestCategory.toLowerCase()}`;
-    if (ingestCategory === "Informatika") hubId = "hub_ml";
 
     const newId = `user_node_${Date.now()}`;
     const newNode = {
@@ -205,13 +241,13 @@ function App() {
     }
 
     try {
-      await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes', {
+      await fetch(`http://127.0.0.1:8000/nodes?layout_id=${activeLayout}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newNode)
       });
       for(let l of newLinks) {
-        await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/links', {
+        await fetch(`http://127.0.0.1:8000/links?layout_id=${activeLayout}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(l)
@@ -241,7 +277,7 @@ function App() {
     const newCat = { id: catId, name: name, color: newCatColor, icon: "📁" };
     
     // Sync to backend
-    fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/categories', {
+    fetch(`http://127.0.0.1:8000/categories?layout_id=${activeLayout}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newCat)
@@ -263,7 +299,7 @@ function App() {
       seed: Math.random() * 8
     };
 
-    fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes', {
+    fetch(`http://127.0.0.1:8000/nodes?layout_id=${activeLayout}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newHubNode)
@@ -281,17 +317,25 @@ function App() {
     const deletingNode = nodes.find(n => n.id === nodeId);
     const label = deletingNode ? deletingNode.label : "Catatan";
 
-    await fetch(`https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes/${nodeId}`, { method: 'DELETE' });
+    await fetch(`http://127.0.0.1:8000/nodes/${nodeId}?layout_id=${activeLayout}`, { method: 'DELETE' });
     setNodes(prev => prev.filter(n => n.id !== nodeId));
     setLinks(prev => prev.filter(l => l.source !== nodeId && l.target !== nodeId));
     setSelectedNodes(prev => prev.filter(id => id !== nodeId));
     
     // Sync Category Deletion
     if (deletingNode && deletingNode.isHub) {
-      await fetch(`https://brainnode-pro-291742583447.asia-southeast2.run.app/categories/${deletingNode.category}`, { method: 'DELETE' }).catch(() => null);
+      await fetch(`http://127.0.0.1:8000/categories/${deletingNode.category}?layout_id=${activeLayout}`, { method: 'DELETE' }).catch(() => null);
       setActiveCategories(prev => prev.filter(c => c.id !== deletingNode.category));
+      setNodes(prev => prev.filter(n => n.category !== deletingNode.category));
+      setLinks(prev => prev.filter(l => {
+        const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+        const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+        const sourceNode = nodes.find(n => n.id === sourceId);
+        const targetNode = nodes.find(n => n.id === targetId);
+        return sourceNode?.category !== deletingNode.category && targetNode?.category !== deletingNode.category;
+      }));
       if (currentCategoryFilter === deletingNode.category) setCurrentCategoryFilter("All");
-      if (ingestCategory === deletingNode.category) setIngestCategory("Trading");
+      if (ingestCategory === deletingNode.category) setIngestCategory("");
     }
     
     if (selectedNode && selectedNode.id === nodeId) {
@@ -313,7 +357,7 @@ function App() {
   const saveEdit = async () => {
     if(!editTitle || !editBody) return showToast("❌ Judul dan isi tidak boleh kosong!");
     try {
-      await fetch(`https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes/${selectedNode.id}`, {
+      await fetch(`http://127.0.0.1:8000/nodes/${selectedNode.id}?layout_id=${activeLayout}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: editTitle, content: editBody })
@@ -322,6 +366,8 @@ function App() {
       const updatedNode = { ...selectedNode, label: editTitle, content: editBody };
       setNodes(prev => prev.map(n => n.id === selectedNode.id ? updatedNode : n));
       setSelectedNode(updatedNode);
+      setNodeUpdates(prev => ({ ...prev, [selectedNode.id]: Date.now() }));
+      setCurrentTime(Date.now());
       setIsReaderEditing(false);
       showToast("✨ Catatan Berhasil Diperbarui");
     } catch(err) {
@@ -350,7 +396,7 @@ function App() {
       createdStep: currentTimelineStep,
       seed: Math.random() * 5
     };
-    fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/nodes', {
+    fetch(`http://127.0.0.1:8000/nodes?layout_id=${activeLayout}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newCard)
@@ -372,8 +418,102 @@ function App() {
     showToast("🌀 Koordinat Grafik Diacak");
   };
 
+  const renderRichText = (text) => {
+    if (!text) return null;
+    
+    // Split by code blocks first (Supports standard ``` or custom [kode=lang]...[tutup])
+    const parts = text.split(/(```[\s\S]*?(?:```|$)|\[kode(?:=[a-zA-Z0-9]+)?\][\s\S]*?(?:\[tutup\]|$))/gi);
+    
+    return parts.map((part, index) => {
+      const isMarkdownCode = part.startsWith('```');
+      const isEasyCode = part.toLowerCase().startsWith('[kode');
+      
+      if (isMarkdownCode || isEasyCode) {
+        let block = part;
+        let lang = '';
+        let code = '';
+        
+        if (isMarkdownCode) {
+          block = block.slice(3);
+          if (block.endsWith('```')) block = block.slice(0, -3);
+          const lines = block.split('\n');
+          lang = lines[0].trim();
+          code = lines.slice(1).join('\n').trim();
+        } else {
+          const firstBracketEnd = block.indexOf(']');
+          const tag = block.substring(0, firstBracketEnd + 1);
+          if (tag.includes('=')) {
+            lang = tag.split('=')[1].replace(']', '').trim();
+          }
+          block = block.substring(firstBracketEnd + 1);
+          if (block.toLowerCase().endsWith('[tutup]')) block = block.slice(0, -7);
+          code = block.trim();
+        }
+        
+        const highlightCode = (str) => {
+          if (!str) return '';
+          let h = str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          
+          const kw = ['def', 'return', 'if', 'else', 'elif', 'for', 'while', 'import', 'from', 'class', 'function', 'const', 'let', 'var', 'await', 'async', 'try', 'catch', 'True', 'False', 'None', 'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'JOIN', 'ON', 'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'AND', 'OR', 'NOT', 'IN', 'IS', 'NULL', 'AS'];
+          const regex = new RegExp(`(&quot;.*?&quot;|&#39;.*?&#39;|".*?"|'.*?'|\\/\\/.*|#.*|\\b(?:${kw.join('|')})\\b|[a-zA-Z_$][a-zA-Z0-9_$]*(?=\\s*\\()|\\b\\d+\\b)`, 'g');
+          
+          return h.replace(regex, (match) => {
+            if (match.startsWith('"') || match.startsWith("'") || match.startsWith('&quot;') || match.startsWith('&#39;')) {
+              return `<span class="text-green-400">${match}</span>`;
+            }
+            if (match.startsWith('//') || match.startsWith('#')) {
+              return `<span class="text-zinc-500 italic">${match}</span>`;
+            }
+            if (/^\d+$/.test(match)) {
+              return `<span class="text-orange-400">${match}</span>`;
+            }
+            if (kw.includes(match)) {
+              return `<span class="text-pink-500 font-bold">${match}</span>`;
+            }
+            return `<span class="text-blue-400">${match}</span>`;
+          });
+        };
+        
+        return (
+          <div key={index} className="my-6 rounded-xl overflow-hidden border border-zinc-800 bg-[#1e1e1e] shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-zinc-800">
+              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{lang || 'CODE'}</span>
+              <div className="flex space-x-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
+              </div>
+            </div>
+            <pre className="p-4 overflow-x-auto text-xs md:text-sm font-mono text-zinc-300 leading-relaxed bg-[#1e1e1e] select-text">
+              <code dangerouslySetInnerHTML={{ __html: highlightCode(code) }}></code>
+            </pre>
+          </div>
+        );
+      }
+      
+      const lines = part.split('\n');
+      return (
+        <span key={index}>
+          {lines.map((line, lIndex) => {
+            let html = line
+              .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-bold">$1</strong>')
+              .replace(/\*(.*?)\*/g, '<em class="text-zinc-400 italic">$1</em>')
+              .replace(/\[\[(.*?)\]\]/g, '<span class="text-violet-400 font-bold bg-violet-400/10 px-1 py-0.5 rounded cursor-pointer hover:bg-violet-400/20 transition">#$1</span>');
+              
+            return (
+              <React.Fragment key={lIndex}>
+                <span dangerouslySetInnerHTML={{ __html: html }} />
+                {lIndex < lines.length - 1 && <br />}
+              </React.Fragment>
+            );
+          })}
+        </span>
+      );
+    });
+  };
+
   return (
-    <div className="flex-1 flex flex-col w-full h-full text-zinc-100 font-sans select-none overflow-hidden bg-zinc-950">
+    <div className="flex-1 flex flex-col w-full h-full text-zinc-100 font-sans overflow-hidden bg-zinc-950">
       
       {/* HEADER */}
       <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md px-6 py-4 flex items-center justify-between z-10">
@@ -384,14 +524,79 @@ function App() {
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
-              BrainNode <span className="text-[9px] bg-indigo-950 border border-indigo-900 text-indigo-400 px-2 py-0.5 rounded-full font-semibold">Pro Engine</span>
+            <h1 className="text-base font-bold tracking-tight text-white">
+              BrainNode
             </h1>
-            <p className="text-[9px] text-zinc-500 tracking-wider font-semibold uppercase">Decentralized Multi-Cluster Graph</p>
           </div>
         </div>
 
         <div className="flex items-center space-x-4">
+          <div className="relative">
+            <button 
+              onClick={() => setLayoutMenuOpen(!layoutMenuOpen)}
+              className="flex items-center space-x-2 bg-zinc-900/80 hover:bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-800 transition shadow-sm"
+            >
+              <span className="text-[10px] text-zinc-400 font-bold uppercase">Layout:</span>
+              <span className="text-xs font-bold text-violet-400 truncate max-w-[100px]">{activeLayout}</span>
+              <svg className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${layoutMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {layoutMenuOpen && (
+              <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl py-1 z-50 overflow-hidden backdrop-blur-xl">
+                {layouts.map(l => (
+                  <button
+                    key={l}
+                    onClick={() => { setActiveLayout(l); setLayoutMenuOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-zinc-800 flex items-center justify-between ${activeLayout === l ? 'text-violet-400 bg-violet-400/5' : 'text-zinc-300'}`}
+                  >
+                    <span>{l}</span>
+                    {activeLayout === l && <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]"></span>}
+                  </button>
+                ))}
+                <div className="h-px bg-zinc-800 my-1"></div>
+                <button
+                  onClick={() => {
+                    setLayoutMenuOpen(false);
+                    const name = prompt("Nama layout baru (tanpa spasi):");
+                    if (name && name.trim() !== "") {
+                       fetch(`http://127.0.0.1:8000/layouts/${name.trim()}`, { method: 'POST' }).then(() => {
+                          setLayouts(prev => { if(!prev.includes(name.trim())) return [...prev, name.trim()]; return prev; });
+                          setActiveLayout(name.trim());
+                       });
+                    }
+                  }}
+                  className="w-full text-left px-4 py-2 text-xs font-bold text-indigo-400 hover:bg-indigo-400/10 hover:text-indigo-300 transition flex items-center space-x-1.5"
+                >
+                  <span className="text-lg leading-none">+</span>
+                  <span>Buat Layout Baru</span>
+                </button>
+                {activeLayout !== "default" && (
+                  <button
+                    onClick={() => {
+                      setLayoutMenuOpen(false);
+                      if (window.confirm(`Yakin ingin menghapus layout "${activeLayout}" beserta seluruh isinya?`)) {
+                        fetch(`http://127.0.0.1:8000/layouts/${activeLayout}`, { method: 'DELETE' }).then(res => res.json()).then(data => {
+                          if (data.status === 'success') {
+                            setLayouts(prev => prev.filter(l => l !== activeLayout));
+                            setActiveLayout("default");
+                            showToast(`🗑️ Layout "${activeLayout}" telah dihapus.`);
+                          } else {
+                            showToast("❌ Gagal menghapus layout.");
+                          }
+                        });
+                      }
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-400/10 hover:text-red-300 transition flex items-center space-x-2"
+                  >
+                    <span className="text-[10px]">🗑️</span>
+                    <span>Hapus Layout Ini</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="bg-zinc-900 p-0.5 rounded-xl border border-zinc-800 flex">
             <button onClick={() => { setCanvasMode('galaxy'); showToast("🌌 Mengaktifkan Fisika Galaksi Berputar..."); }}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition duration-200 ${canvasMode === 'galaxy' ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:text-white'}`}>
@@ -425,7 +630,7 @@ function App() {
                   formData.append("file", file);
                   
                   try {
-                    const res = await fetch('https://brainnode-pro-291742583447.asia-southeast2.run.app/ingest', {
+                    const res = await fetch(`http://127.0.0.1:8000/ingest?layout_id=${activeLayout}`, {
                       method: 'POST',
                       body: formData
                     });
@@ -485,11 +690,16 @@ function App() {
                 <input value={ingestTitle} onChange={e => setIngestTitle(e.target.value)} type="text" placeholder="Masukkan judul..." className="w-full mt-1 px-3 py-2 bg-zinc-900/50 border border-zinc-900 rounded-xl text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-violet-600 transition" />
               </div>
               <div>
-                <div className="flex justify-between items-center">
-                  <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Isi / Transkripsi Dokumen</label>
-                  <span className="text-[8px] text-violet-400 font-semibold uppercase tracking-wider cursor-pointer" onClick={() => setIngestBody(prev => prev + " [[Nama Node]]")}>+ Tautan Wiki</span>
-                </div>
-                <textarea value={ingestBody} onChange={e => setIngestBody(e.target.value)} rows={4} placeholder="Ketik ide... Gunakan [[Nama Node]] untuk membuat tautan dua arah otomatis lintas klaster!" className="w-full mt-1 px-3 py-2 bg-zinc-900/50 border border-zinc-900 rounded-xl text-xs text-zinc-200 focus:outline-none focus:ring-1 focus:ring-violet-600 transition resize-none"></textarea>
+                <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-1 block">Isi / Transkripsi Dokumen</label>
+                <button 
+                  onClick={() => setIsTypingModalOpen(true)}
+                  className="w-full text-left px-3 py-3 bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-900 hover:border-violet-500/50 rounded-xl text-xs text-zinc-400 hover:text-zinc-200 transition flex items-center justify-between group shadow-sm"
+                >
+                  <span className="truncate">{ingestBody ? ingestBody.substring(0, 30) + '...' : 'Tulis isi catatan di sini...'}</span>
+                  <svg className="w-4 h-4 text-zinc-600 group-hover:text-violet-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
               </div>
               <div>
                 <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Klaster Utama (Kategori)</label>
@@ -512,7 +722,7 @@ function App() {
                 <label className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Buat Klaster Baru</label>
                 <div className="flex gap-2">
                   <input value={newCatName} onChange={e => setNewCatName(e.target.value)} type="text" placeholder="Nama Kategori..." className="flex-1 px-3 py-1.5 bg-zinc-900/50 border border-zinc-900 rounded-xl text-[11px] text-zinc-200 focus:outline-none focus:ring-1 focus:ring-violet-600 transition" />
-                  <input value={newCatColor} onChange={e => setNewCatColor(e.target.value)} type="color" className="w-8 h-8 rounded-lg border-0 bg-transparent cursor-pointer p-0 m-0" />
+                  <input value={newCatColor} onChange={e => setNewCatColor(e.target.value)} type="color" className="w-8 h-8 rounded-full overflow-hidden border-0 bg-transparent cursor-pointer p-0 m-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full [&::-moz-color-swatch]:border-none [&::-moz-color-swatch]:rounded-full" />
                   <button onClick={handleAddCategory} className="px-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 rounded-xl text-xs text-zinc-300 hover:text-white transition font-bold" title="Tambah Klaster">+</button>
                 </div>
               </div>
@@ -586,15 +796,30 @@ function App() {
             ))}
           </div>
 
-          <div className="absolute top-4 right-4 z-10 flex flex-col space-y-2 items-end">
-            <div className="relative max-w-xs w-48 shadow-xl">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-600">🔍</span>
-              <input onChange={e => setSearchKeyword(e.target.value.toLowerCase())} type="text" placeholder="Pencarian makna..."
-                className="w-full bg-zinc-900/80 backdrop-blur border border-zinc-850 hover:border-zinc-800 rounded-xl py-1.5 pl-9 pr-4 text-[10px] font-bold text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-600 transition" />
-            </div>
-            <button onClick={scramble} className="px-3 py-1.5 bg-zinc-900/80 border border-zinc-850 hover:border-zinc-800 text-zinc-400 hover:text-white rounded-xl text-[10px] font-bold backdrop-blur transition hover:scale-105 shadow-xl">
-              🔄 Guncang Layout
+          <div className="absolute top-4 right-4 z-10 flex items-center space-x-3">
+            <button 
+              onClick={scramble} 
+              title="Guncang Layout (Scramble)"
+              className="p-2 bg-zinc-900/60 hover:bg-zinc-800/80 backdrop-blur-md border border-zinc-800/50 hover:border-zinc-700/50 text-zinc-400 hover:text-white rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] shadow-lg flex items-center justify-center group"
+            >
+              <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             </button>
+            
+            <div className="relative group shadow-lg">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg className="w-3.5 h-3.5 text-zinc-500 group-focus-within:text-violet-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input 
+                onChange={e => setSearchKeyword(e.target.value.toLowerCase())} 
+                type="text" 
+                placeholder="Pencarian makna..."
+                className="w-56 bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl py-2 pl-9 pr-4 text-xs font-medium text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500/50 focus:bg-zinc-900/90 focus:shadow-[0_0_15px_rgba(139,92,246,0.15)] transition-all duration-300" 
+              />
+            </div>
           </div>
 
           {!loading && (
@@ -614,8 +839,17 @@ function App() {
             />
           )}
 
+          {/* TIMELINE TOGGLE BUTTON */}
+          <button 
+            onClick={() => setShowTimeline(!showTimeline)}
+            className="absolute bottom-4 left-4 z-20 bg-zinc-900/90 border border-zinc-800 text-zinc-400 hover:text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 backdrop-blur shadow-xl hover:bg-zinc-800 transition"
+          >
+            <span>🕒</span>
+            <span>{showTimeline ? 'Tutup Timeline' : 'Time-Travel'}</span>
+          </button>
+
           {/* TIMELINE BAR */}
-          <div className="absolute bottom-16 left-4 right-4 bg-zinc-900/90 border border-zinc-850 backdrop-blur p-4 rounded-2xl max-w-2xl mx-auto shadow-2xl space-y-2 z-10">
+          <div className={`absolute bottom-16 left-4 right-4 bg-zinc-900/90 border border-zinc-850 backdrop-blur p-4 rounded-2xl max-w-2xl mx-auto shadow-2xl space-y-2 z-10 transition-all duration-300 transform ${showTimeline ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-1.5">
                 <span className="text-xs">🕒</span>
@@ -652,7 +886,7 @@ function App() {
             </div>
           </div>
 
-          <div className={`absolute bottom-4 left-4 right-16 bg-zinc-900/40 border border-zinc-900/30 backdrop-blur py-2.5 rounded-2xl max-w-lg mx-auto text-center px-4 pointer-events-none z-10 transition-all duration-500 transform ${showHint ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <div className={`absolute bottom-4 left-40 right-16 bg-zinc-900/40 border border-zinc-900/30 backdrop-blur py-2.5 rounded-2xl max-w-lg mx-auto text-center px-4 pointer-events-none z-10 transition-all duration-500 transform ${showHint ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             <p className="text-[10px] text-zinc-300">
               🧠 <b>Interaksi Pintar:</b> Tahan <b className="text-violet-400">SHIFT + Klik</b> untuk memilih banyak *node*. <b className="text-violet-400">Double-Click</b> pada Hub Rumpun untuk fokus.
             </p>
@@ -768,6 +1002,39 @@ function App() {
         </div>
       )}
 
+      {/* TYPING MODAL */}
+      {isTypingModalOpen && (
+        <div className="fixed inset-0 bg-zinc-950/98 backdrop-blur-xl z-50 flex flex-col select-text transition-all duration-300">
+          <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md px-6 py-4 flex items-center justify-between shadow-lg">
+            <h2 className="text-sm font-bold tracking-tight text-white flex items-center space-x-2">
+              <span className="text-xl">📝</span>
+              <span>Mode Fokus Editor</span>
+            </h2>
+            <div className="flex items-center space-x-3">
+              <button onClick={() => setIngestBody(prev => prev + " [[Nama Node]]")} className="px-3.5 py-1.5 bg-violet-950/40 hover:bg-violet-900/80 border border-violet-900/50 text-violet-400 hover:text-white rounded-xl text-xs font-bold transition">
+                + Tautan Wiki
+              </button>
+              <button onClick={() => setIsTypingModalOpen(false)} className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-600/20">
+                💾 Simpan & Tutup
+              </button>
+              <button onClick={() => { setIngestBody(""); setIsTypingModalOpen(false); }} className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-red-400 rounded-xl text-xs font-bold transition">
+                🗑️ Batal & Hapus
+              </button>
+            </div>
+          </header>
+          
+          <main className="flex-1 w-full max-w-4xl mx-auto px-6 py-12 flex flex-col">
+            <textarea 
+              autoFocus
+              value={ingestBody} 
+              onChange={e => setIngestBody(e.target.value)} 
+              placeholder="Ketik ide panjang Anda di sini secara leluasa...&#10;&#10;Gunakan [[Nama Node]] untuk membuat tautan dua arah otomatis lintas klaster!" 
+              className="flex-1 w-full bg-transparent border-0 text-base md:text-lg text-zinc-200 focus:outline-none focus:ring-0 resize-none placeholder-zinc-700 leading-relaxed font-sans"
+            ></textarea>
+          </main>
+        </div>
+      )}
+
       {/* FULLSCREEN READER */}
       {readerOpen && selectedNode && (
         <div className="fixed inset-0 bg-zinc-950/98 backdrop-blur-xl z-50 flex flex-col select-text">
@@ -811,15 +1078,15 @@ function App() {
                   <input value={editTitle} onChange={e => setEditTitle(e.target.value)} type="text" className="text-3xl md:text-5xl font-extrabold tracking-tight text-white leading-tight bg-transparent border-b border-zinc-800 focus:border-indigo-500 focus:outline-none w-full pb-2" />
                 )}
                 <div className="flex items-center space-x-4 text-[11px] text-zinc-500 font-medium tracking-wide">
-                  <span>🕒 Est. Membaca: {Math.max(1, Math.ceil((selectedNode.content.split(/\s+/).filter(Boolean).length)/180))} menit</span>
-                  <span>•</span><span>Diperbarui Baru Saja</span>
+                  <span>🕒 Est. Membaca: {Math.max(1, Math.ceil(((isReaderEditing ? editBody : selectedNode.content).replace(/<[^>]*>?/gm, '').split(/\s+/).filter(Boolean).length)/180))} menit</span>
+                  <span>•</span><span>{getRelativeTimeString()}</span>
                 </div>
               </div>
               <div className="border-t border-zinc-900 pt-8">
                 {!isReaderEditing ? (
-                  <p className="text-zinc-300 text-sm md:text-base leading-relaxed whitespace-pre-wrap font-light">
-                    {selectedNode.content}
-                  </p>
+                  <div className="text-zinc-300 text-sm md:text-base leading-relaxed font-light">
+                    {renderRichText(selectedNode.content)}
+                  </div>
                 ) : (
                   <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={14} className="text-zinc-300 text-sm md:text-base leading-relaxed font-light bg-transparent border border-zinc-800 focus:border-indigo-500 focus:outline-none w-full rounded-xl p-4 resize-none"></textarea>
                 )}
