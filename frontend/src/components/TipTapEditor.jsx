@@ -103,6 +103,31 @@ export default function TipTapEditor({ content, onChange }) {
       )}
 
       {editor && (
+        <BubbleMenu 
+          editor={editor} 
+          tippyOptions={{ duration: 100, placement: 'bottom' }} 
+          shouldShow={({ editor }) => editor.isActive('table')}
+          className="bg-zinc-900 border border-zinc-700 shadow-2xl rounded-xl flex overflow-hidden backdrop-blur-xl divide-x divide-zinc-800"
+        >
+          <button onClick={() => editor.chain().focus().addRowAfter().run()} className="px-3 py-2 text-[10px] font-bold transition hover:bg-zinc-800 text-zinc-300">
+            + Baris Bawah
+          </button>
+          <button onClick={() => editor.chain().focus().addColumnAfter().run()} className="px-3 py-2 text-[10px] font-bold transition hover:bg-zinc-800 text-zinc-300">
+            + Kolom Kanan
+          </button>
+          <button onClick={() => editor.chain().focus().deleteRow().run()} className="px-3 py-2 text-[10px] font-bold transition hover:bg-zinc-800 text-orange-400">
+            - Hapus Baris
+          </button>
+          <button onClick={() => editor.chain().focus().deleteColumn().run()} className="px-3 py-2 text-[10px] font-bold transition hover:bg-zinc-800 text-orange-400">
+            - Hapus Kolom
+          </button>
+          <button onClick={() => editor.chain().focus().deleteTable().run()} className="px-3 py-2 text-[10px] font-bold transition hover:bg-red-900/40 bg-red-950/20 text-red-400">
+            🗑 Hapus Tabel
+          </button>
+        </BubbleMenu>
+      )}
+
+      {editor && (
         <FloatingMenu editor={editor} tippyOptions={{ duration: 100, placement: 'right' }} className="flex space-x-1 bg-zinc-950/90 p-1 border border-zinc-800 rounded-lg shadow-xl backdrop-blur-md">
           <button onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className="w-8 h-8 flex items-center justify-center rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold text-xs transition">H1</button>
           <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className="w-8 h-8 flex items-center justify-center rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold text-xs transition">H2</button>
