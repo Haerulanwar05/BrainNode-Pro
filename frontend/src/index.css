@@ -33,3 +33,42 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: #334155;
 }
+
+/* TipTap Editor Styles */
+.tiptap-container .tiptap {
+  outline: none;
+  min-height: 100%;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: #52525b;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap h1 { font-size: 2.25rem; font-weight: 800; margin-top: 1.5rem; letter-spacing: -0.025em; color: #ffffff; }
+.tiptap h2 { font-size: 1.75rem; font-weight: 700; margin-top: 1.25rem; color: #f4f4f5; }
+.tiptap h3 { font-size: 1.25rem; font-weight: 600; margin-top: 1rem; color: #d4d4d8; }
+
+ul[data-type="taskList"] { list-style: none; padding: 0; }
+ul[data-type="taskList"] li { display: flex; align-items: flex-start; margin-bottom: 0.5rem; }
+ul[data-type="taskList"] li > label { margin-right: 0.75rem; user-select: none; }
+ul[data-type="taskList"] li > label input { accent-color: #8b5cf6; width: 1.1rem; height: 1.1rem; cursor: pointer; }
+ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; color: #71717a; }
+
+.tiptap pre {
+  background: #18181b; color: #a5b4fc; border: 1px solid #27272a; border-radius: 0.75rem; padding: 1.25rem;
+  margin: 1.5rem 0; font-family: 'Consolas', monospace; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+}
+.tiptap pre code { background: none; color: inherit; font-size: 0.9em; padding: 0; }
+
+.hljs-keyword, .hljs-operator { color: #c678dd; }
+.hljs-string, .hljs-meta .hljs-string { color: #98c379; }
+.hljs-function, .hljs-title { color: #61afef; }
+.hljs-number, .hljs-boolean { color: #d19a66; }
+
+.tiptap table { border-collapse: collapse; table-layout: fixed; width: 100%; margin: 1.5rem 0; overflow: hidden; border-radius: 0.5rem; border-style: hidden; box-shadow: 0 0 0 1px #27272a; }
+.tiptap td, .tiptap th { min-width: 1em; border: 1px solid #27272a; padding: 0.75rem 1rem; vertical-align: top; box-sizing: border-box; position: relative; }
+.tiptap th { background-color: #18181b; font-weight: 600; text-align: left; color: #f4f4f5; }

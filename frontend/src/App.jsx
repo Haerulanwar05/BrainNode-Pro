@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import GalaxyCanvas from './components/GalaxyCanvas';
+import TipTapEditor from './components/TipTapEditor';
 
 const INITIAL_CATEGORIES = [];
 
@@ -1023,14 +1024,8 @@ function App() {
             </div>
           </header>
           
-          <main className="flex-1 w-full max-w-4xl mx-auto px-6 py-12 flex flex-col">
-            <textarea 
-              autoFocus
-              value={ingestBody} 
-              onChange={e => setIngestBody(e.target.value)} 
-              placeholder="Ketik ide panjang Anda di sini secara leluasa...&#10;&#10;Gunakan [[Nama Node]] untuk membuat tautan dua arah otomatis lintas klaster!" 
-              className="flex-1 w-full bg-transparent border-0 text-base md:text-lg text-zinc-200 focus:outline-none focus:ring-0 resize-none placeholder-zinc-700 leading-relaxed font-sans"
-            ></textarea>
+          <main className="flex-1 w-full max-w-4xl mx-auto px-6 py-12 flex flex-col tiptap-app-wrapper">
+            <TipTapEditor content={ingestBody} onChange={setIngestBody} />
           </main>
         </div>
       )}
@@ -1088,7 +1083,7 @@ function App() {
                     {renderRichText(selectedNode.content)}
                   </div>
                 ) : (
-                  <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={14} className="text-zinc-300 text-sm md:text-base leading-relaxed font-light bg-transparent border border-zinc-800 focus:border-indigo-500 focus:outline-none w-full rounded-xl p-4 resize-none"></textarea>
+                  <TipTapEditor content={editBody} onChange={setEditBody} />
                 )}
               </div>
             </main>
