@@ -97,7 +97,7 @@ def delete_layout(layout_id: str):
         return {"status": "success"}
     except Exception as e:
         logger.error(f"Error: {e}")
-        return {"status": "error"}
+        return {"status": "error", "message": str(e)}
 
 @app.get("/nodes", response_model=List[Node])
 def get_nodes(layout_id: str = "default"):

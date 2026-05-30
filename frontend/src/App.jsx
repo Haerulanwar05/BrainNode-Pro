@@ -585,7 +585,7 @@ function App() {
                             setActiveLayout("default");
                             showToast(`🗑️ Layout "${activeLayout}" telah dihapus.`);
                           } else {
-                            showToast("❌ Gagal menghapus layout.");
+                            showToast(`❌ Gagal menghapus layout: ${data.message || "Unknown error"}`);
                           }
                         });
                       }
